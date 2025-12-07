@@ -47,3 +47,18 @@ const orderconfirm = async (request, h) => {
 const ordercancel = async (request, h) => {
 
 };
+
+module.exports = {
+    usrdashboard,
+    searchproduct,
+    productdetail,
+    keranjang,
+    tambahkeranjang,
+    detailkeranjang,
+    hapuskeranjang,
+    order,
+    orderlist,
+    orderdetail,
+    orderconfirm,
+    ordercancel
+}
