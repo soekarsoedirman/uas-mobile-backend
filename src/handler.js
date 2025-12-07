@@ -1,55 +1,81 @@
 const { S3Client } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
+const { v4: uuidv4 } = require('uuid');
 
-// Karena pakai IAM Role, tidak perlu isi credentials di sini!
-// SDK akan otomatis mendeteksi Role dari EC2.
-const s3 = new S3Client({
-    region: 'us-east-1' // Sesuaikan region bucket Anda (misal ap-southeast-1 untuk Singapore)
+// Inisiasi S3 Client (Otomatis pakai IAM Role EC2)
+const s3 = new S3Client({ 
+    region: process.env.AWS_REGION || 'ap-southeast-3' 
 });
 
-const uploadImage = async (file) => {
-    const upload = new Upload({
-        client: s3,
-        params: {
-            Bucket: 'toko-mobile-project-2025', // Nama bucket Anda
-            Key: `products/${Date.now()}_${file.hapi.filename}`, // Nama file unik
-            Body: file, // Stream file dari Hapi
-            ContentType: file.hapi.headers['content-type'],
-            ACL: 'public-read' // Agar gambar bisa dilihat di aplikasi Flutter
-        }
-    });
+const addProductHandler = async (request, h) => {
+    // 1. Ambil instance database (Knex) dari server.app
+    const db = request.server.app.db;
 
-    const result = await upload.done();
-    return result.Location; // Mengembalikan URL gambar (https://s3...)
+    // 2. Ambil data dari payload
+    const { productName, harga, stok, deskripsi, userID, kategoriID, image } = request.payload;
+
+    try {
+        // --- PROSES UPLOAD KE S3 ---
+        const fileExtension = image.hapi.filename.split('.').pop();
+        const uniqueFileName = `products/${uuidv4()}.${fileExtension}`; // Contoh: products/abc-123.jpg
+
+        const upload = new Upload({
+            client: s3,
+            params: {
+                Bucket: process.env.AWS_BUCKET_NAME,
+                Key: uniqueFileName,
+                Body: image, // Stream file
+                ContentType: image.hapi.headers['content-type'],
+                ACL: 'public-read'
+            }
+        });
+
+        // Tunggu proses upload selesai
+        const s3Result = await upload.done();
+        const imageUrl = s3Result.Location; // URL Gambar dari S3
+
+        // --- PROSES INSERT KE RDS (MySQL) ---
+        // Masukkan data sesuai nama kolom di CSV kamu
+        // Kolom: productID (Auto), userID, productName, kategoriID, harga, stok, terjual, deskripsi, foto
+        
+        const [insertedId] = await db('product').insert({
+            userID: userID,
+            productName: productName,
+            kategoriID: kategoriID,
+            harga: harga,
+            stok: stok,
+            terjual: 0, // Default 0
+            deskripsi: deskripsi,
+            foto: imageUrl // Simpan URL S3 di kolom 'foto'
+        });
+
+        // --- RESPONSE SUKSES ---
+        return h.response({
+            status: 'success',
+            message: 'Produk berhasil ditambahkan',
+            data: {
+                productID: insertedId,
+                productName,
+                imageUrl
+            }
+        }).code(201);
+
+    } catch (error) {
+        console.error('Error saat input produk:', error);
+
+        // Cek error spesifik (misal Foreign Key tidak ketemu)
+        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+            return h.response({
+                status: 'fail',
+                message: 'UserID atau KategoriID tidak ditemukan di database. Pastikan data master ada.'
+            }).code(400);
+        }
+
+        return h.response({
+            status: 'error',
+            message: 'Gagal menambahkan produk'
+        }).code(500);
+    }
 };
 
-// Route Hapi
-server.route({
-    method: 'POST',
-    path: '/upload',
-    options: {
-        payload: {
-            output: 'stream',
-            parse: true,
-            allow: 'multipart/form-data', // Penting untuk upload file
-            maxBytes: 5 * 1024 * 1024 // Limit 5MB
-        }
-    },
-    handler: async (request, h) => {
-        const data = request.payload;
-        if (data.image) {
-            try {
-                const imageUrl = await uploadImage(data.image);
-                // Simpan imageUrl ini ke database RDS Anda di sini
-                return { status: 'success', url: imageUrl };
-            } catch (err) {
-                console.error(err);
-                return h.response({ error: 'Upload failed' }).code(500);
-            }
-        }
-        return h.response({ error: 'No image provided' }).code(400);
-    }
-});
-
-
-module.exports = uploadImage;
+module.exports = { addProductHandler };

@@ -1,0 +1,6 @@
+Data buat BE
+
+
+database end point
+gudang-uas.c388oyckgn5l.ap-southeast-3.rds.amazonaws.com
+
