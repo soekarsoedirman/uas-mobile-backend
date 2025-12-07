@@ -1,8 +1,7 @@
 require('dotenv').config();
 const Hapi = require('@hapi/hapi');
+const Jwt = require('@hapi/jwt'); // Import Plugin JWT
 const routes = require('./routes');
-
-// Konfigurasi Knex (Query Builder untuk MySQL)
 const knex = require('knex')({
     client: 'mysql2',
     connection: {
@@ -12,24 +11,52 @@ const knex = require('knex')({
         database: process.env.DB_NAME,
         port: 3306
     },
-    pool: { min: 2, max: 10 } // Connection pooling agar performa stabil
+    pool: { min: 2, max: 10 }
 });
 
 const init = async () => {
     const server = Hapi.server({
-        port: process.env.PORT || 5000,
+        port: process.env.PORT || 3000,
         host: process.env.HOST || '0.0.0.0',
         routes: {
-            cors: {
-                origin: ['*'] // Mengizinkan akses dari Flutter/Postman
-            }
+            cors: { origin: ['*'] }
         }
     });
 
-    // Tempelkan instance DB ke server.app agar bisa diakses di handler
     server.app.db = knex;
 
-    // Cek koneksi database saat startup
+    // --- 1. REGISTER PLUGIN JWT ---
+    await server.register(Jwt);
+
+    // --- 2. DEFINISI STRATEGI AUTH ---
+    server.auth.strategy('my_jwt_strategy', 'jwt', {
+        keys: process.env.JWT_SECRET || 'RAHASIA_DAPUR_JANGAN_DISEBAR', // Kunci Rahasia
+        verify: {
+            aud: false,
+            iss: false,
+            sub: false,
+            nbf: true,
+            exp: true, // Cek expired token otomatis
+            maxAgeSec: 14400 // 4 Jam
+        },
+        validate: (artifacts, request, h) => {// eslint-disable-line no-unused-vars
+            // Fungsi ini jalan otomatis saat token diterima
+            // artifacts.decoded.payload berisi data { id, role, name } yang kita buat saat login
+            return {
+                isValid: true,
+                credentials: { 
+                    user: artifacts.decoded.payload // Data user disimpan di request.auth.credentials.user
+                }
+            };
+        }
+    });
+
+    // --- 3. KUNCI SEMUA ROUTE SECARA DEFAULT ---
+    // Dengan baris ini, SEMUA route otomatis WAJIB Login
+    // Kecuali route yang dikasih opsi "auth: false"
+    server.auth.default('my_jwt_strategy');
+
+    // Cek Database
     try {
         await knex.raw('SELECT 1');
         console.log('✅ Terkoneksi ke RDS Database');
@@ -38,7 +65,6 @@ const init = async () => {
         process.exit(1);
     }
 
-    // Daftarkan Routes
     server.route(routes);
 
     await server.start();
