@@ -5,26 +5,42 @@ async function checkDatabase() {
     try {
         connection = await pool.getConnection();
         
-        console.log('\n--- 🔍 MEMERIKSA DATABASE ---');
+        console.log('\n--- 🔍 MEMERIKSA SELURUH DATA DATABASE ---');
 
-        // 1. Cek Tabel Role
-        const [roles] = await connection.query('SELECT * FROM role');
-        console.log('\n📂 Data Role:');
-        console.table(roles);
+        // Daftar semua tabel yang ingin dicek
+        const tables = [
+            'role', 
+            'kategori', 
+            'user', 
+            'product', 
+            'keranjang', 
+            'pembelian'
+        ];
 
-        // 2. Cek Tabel Kategori
-        const [kategori] = await connection.query('SELECT * FROM kategori');
-        console.log('\n📂 Data Kategori:');
-        console.table(kategori);
+        for (const tableName of tables) {
+            // Query ambil semua data
+            const [rows] = await connection.query(`SELECT * FROM ${tableName}`);
+            
+            console.log(`\n📂 Tabel: ${tableName.toUpperCase()}`);
+            
+            if (rows.length > 0) {
+                // Tampilkan data jika ada
+                console.table(rows);
+            } else {
+                // Beri info jika kosong
+                console.log('   ⚠️  (Tabel ini masih kosong / belum ada data)');
+            }
+        }
 
-        // 3. Cek Struktur Tabel Product (Memastikan kolom foto ada)
+        console.log('\n--- 🔍 CEK STRUKTUR TABEL PRODUCT ---');
+        // Pastikan kolom foto ada (karena penting untuk S3)
         const [columns] = await connection.query('SHOW COLUMNS FROM product');
         const kolomFoto = columns.find(col => col.Field === 'foto');
         
         if (kolomFoto) {
-            console.log('\n✅ Tabel Product Valid (Kolom FOTO ditemukan)');
+            console.log('✅ Struktur Valid: Kolom FOTO ditemukan.');
         } else {
-            console.error('\n❌ WARNING: Kolom FOTO tidak ditemukan di tabel Product!');
+            console.error('❌ WARNING: Kolom FOTO hilang!');
         }
 
     } catch (error) {
