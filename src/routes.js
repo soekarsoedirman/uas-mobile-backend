@@ -33,23 +33,21 @@ const routes = [
         method: 'POST',
         path: '/login',
         options: {
-            auth: false, 
+            auth: false 
         },
         handler: authlogin,
     },
     {
         method: 'POST',
         path: '/register',
-        options: {
-            auth: { mode: 'optional' } 
-        },
+        options: {auth: false},
         handler: authregister,
     },
     {
         method: 'POST',
         path: '/logout',
         options: {
-            auth: false, 
+            auth: false 
         },
         handler: authlogout,
     },
@@ -245,17 +243,14 @@ const routes = [
     {
         method: "*",
         path: '/{any*}', 
+        options: { auth: false },
         handler: (request, h) => {
-            const response = h.response({
-                status: 'fail',
-                message: 'Halaman tidak ditemukan',
-            });
-
-            response.code(404);
-            
-            return response;
+            return h
+                .response({ status: 'fail', message: 'Halaman tidak ditemukan' })
+                .code(404);
         }
     },
+
 ];
 
 module.exports = routes;
