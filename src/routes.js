@@ -41,7 +41,7 @@ const routes = [
         method: 'POST',
         path: '/register',
         options: {
-            auth: false, 
+            auth: { mode: 'optional' } 
         },
         handler: authregister,
     },
@@ -69,6 +69,9 @@ const routes = [
     {
         method: 'GET',
         path:'/products/{id}',
+        options: {
+            auth: false, 
+        },
         handler: productdetail,
     },
     {
