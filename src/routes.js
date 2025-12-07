@@ -96,12 +96,6 @@ const routes = [
         //pembelian
         method: 'POST',
         path: '/order',
-        handler: order,
-    },
-    {
-        //histori pembelian
-        method: 'GET',
-        path: '/order',
         options: {
             validate: {
                 payload: Joi.object({
@@ -109,6 +103,12 @@ const routes = [
                 })
             }
         },
+        handler: order,
+    },
+    {
+        //histori pembelian
+        method: 'GET',
+        path: '/order',
         handler: orderlist,
     },
     {
