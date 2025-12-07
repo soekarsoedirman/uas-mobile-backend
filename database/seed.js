@@ -1,15 +1,15 @@
-const { createConnection } = require('./db_config');
+const pool = require('./db_config'); // Import pool langsung, bukan createConnection
 
 async function runSeed() {
     let connection;
     try {
         console.log('🔄 Menghubungkan ke Database untuk Seeding...');
-        connection = await createConnection();
+        // Ambil koneksi dari pool
+        connection = await pool.getConnection();
 
         console.log('🌱 Mulai mengisi data awal (Seeding)...');
 
-        // 1. Seed ROLE (Pakai INSERT IGNORE agar tidak error jika dijalankan 2x)
-        // Kita paksa ID-nya agar konsisten
+        // 1. Seed ROLE
         const roleSql = `
             INSERT INTO role (roleID, rolename) VALUES 
             (1, 'User'),
@@ -35,10 +35,20 @@ async function runSeed() {
         console.log('🎉 SEEDING SELESAI!');
 
     } catch (error) {
-        console.error('❌ Seeding GAGAL:', error);
+        console.error('❌ SEEDING GAGAL:', error);
     } finally {
-        if (connection) await connection.end();
+        if (connection) connection.release(); // Lepas koneksi
+        // Tutup pool hanya jika script ini dijalankan sendirian (bukan di-import)
+        if (require.main === module) {
+            await pool.end();
+            process.exit(0);
+        }
     }
 }
 
-runSeed();
+// Jalankan fungsi jika file ini dipanggil langsung "node seed.js"
+if (require.main === module) {
+    runSeed();
+}
+
+module.exports = runSeed;
