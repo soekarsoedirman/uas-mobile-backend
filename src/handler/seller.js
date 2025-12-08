@@ -18,17 +18,86 @@ const s3 = new S3Client({
 // slordercancel
 
 const sldashboard = async (request, h) => {
+    const db = request.server.app.db;
+    // KOREKSI 1: Ambil ID dari user.id (sesuai struktur token di auth.js)
+    const sellerID = request.auth.credentials.user.id;
 
+    try {
+        // 1. Hitung Total Produk Saya
+        const productResult = await db('product')
+            .where('userID', sellerID)
+            .count('productID as count')
+            .first();
+
+        // 2. Hitung Total Order & Sales (Hanya yang status SELESAI)
+        // KOREKSI 2: Join ke tabel 'product' dulu untuk tahu seller-nya siapa
+        const salesResult = await db('pembelian')
+            .join('product', 'pembelian.productID', '=', 'product.productID')
+            .where('product.userID', sellerID)       // Filter: Produk milik seller ini
+            .where('pembelian.status', 'Selesai')    // Filter: Hanya hitung yang sudah SELESAI
+            .sum('pembelian.totalHarga as totalSales')
+            .count('pembelian.pembelianID as totalOrders')
+            .first();
+
+        const data = {
+            totalProducts: parseInt(productResult.count) || 0,
+            totalOrders: parseInt(salesResult.totalOrders) || 0,
+            // Handle jika null (belum ada penjualan)
+            totalSales: parseInt(salesResult.totalSales) || 0
+        };
+
+        return h.response({
+            status: 'success',
+            message: 'Data dashboard berhasil dimuat',
+            data: data
+        }).code(200);
+
+    } catch (error) {
+        console.error('Dashboard Error:', error);
+        return h.response({
+            status: 'fail',
+            message: 'Terjadi kesalahan saat mengambil data dashboard'
+        }).code(500);
+    }
 };
-const slproductlist = async (request, h) => {
 
+const slproductlist = async (request, h) => {
+    const db = request.server.app.db;
+    const userID = request.auth.credentials.userID;
+
+    try {
+        const listproducts = await db('product')
+            .join('user', 'product.userID', '=', 'user.userID')
+            .select(
+                'product.productID',
+                'user.userName',
+                'product.productName',
+                'product.harga',
+                'product.terjual',
+                'product.foto'
+            )
+            .where('product.userID', '=', userID);
+        
+        return h.response({
+            status: 'success',
+            message: 'Data produk berhasil diamati',
+            data: listproducts
+        }).code(200);
+    } catch (error) {
+        console.error('Error fetching products:', error);
+        return h.response({
+            status: 'fail',
+            message: 'Terjadi kesalahan saat mengambil data produk'
+        }).code(500);
+    }
 };
 const sladdproduct = async (request, h) => {
     // 1. Ambil instance database (Knex) dari server.app
     const db = request.server.app.db;
+    const sellerID = request.auth.credentials.userID;
 
     // 2. Ambil data dari payload
-    const { productName, harga, stok, deskripsi, userID, kategoriID, image } = request.payload;
+    const { productName, harga, stok, deskripsi, kategoriID, image } = request.payload;
 
     try {
         // --- PROSES UPLOAD KE S3 ---
@@ -55,7 +124,7 @@ const sladdproduct = async (request, h) => {
         // Kolom: productID (Auto), userID, productName, kategoriID, harga, stok, terjual, deskripsi, foto
 
         const [insertedId] = await db('product').insert({
-            userID: userID,
+            userID: sellerID,
             productName: productName,
             kategoriID: kategoriID,
             harga: harga,
@@ -94,22 +163,184 @@ const sladdproduct = async (request, h) => {
     }
 };
 const sleditproduct = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    const { id } = request.params;
+    const { productName, harga, stok, deskripsi, kategoriID, image } = request.payload;
 
+    try {
+        const product = await db('product').where({ productID: id, userID: sellerID }).first();
+        if (!product) return h.response({ status: 'fail', message: 'Akses ditolak / Produk tidak ada' }).code(403);
+
+        let updateData = { productName, harga, stok, deskripsi, kategoriID };
+
+        if (image) {
+            const fileExtension = image.hapi.filename.split('.').pop();
+            const uniqueFileName = `products/${uuidv4()}.${fileExtension}`;
+            const upload = new Upload({
+                client: s3,
+                params: {
+                    Bucket: process.env.AWS_BUCKET_NAME,
+                    Key: uniqueFileName,
+                    Body: image,
+                    ContentType: image.hapi.headers['content-type'],
+                    ACL: 'public-read'
+                }
+            });
+            const s3Result = await upload.done();
+            updateData.foto = s3Result.Location;
+        }
+
+        await db('product').where('productID', id).update(updateData);
+        return h.response({ status: 'success', message: 'Produk diupdate' }).code(200);
+
+    } catch (error) {
+        console.error('Error saat update produk:', error);
+        return h.response({ status: 'error',  message: 'Gagal mengupdate produk' }).code(500);
+    }
 };
 const sldeleteproduct = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    const { id } = request.params;
 
+    try {
+        const product = await db('product').where({ productID: id, userID: sellerID }).dell();
+        return h.response({ 
+            status: 'success', 
+            message: 'Produk dihapus',
+            data: product,
+        }).code(200);
+    } catch (error) {
+        console.error('Error saat delete produk:', error);
+        return h.response({ status: 'error', message: 'Gagal menghapus produk' }).code(500);
+    }
 };
 const slorderlist = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    try {
+        const orderList = await db('pembelian')
+            .join('product', 'pembelian.productID', '=', 'product.productID')
+            .join('user', 'pembelian.userID', '=', 'user.userID')
+            .select(
+                'pembelian.pembelianID',
+                'user.userName',
+                'product.productName',
+                'pembelian.totalHarga',
+                'pembelian.status',
+                'pembelian.tanggalPembelian'
+            )
+            .where('product.userID', '=', sellerID);
 
+        return h.response({
+            status: 'success',
+            message: 'Data order berhasil dimuat',
+            data: orderList
+        }).code(200);
+    } catch (error) {
+        console.error('Error saat fetch order list:', error);
+        return h.response({ status: 'error', message: 'Gagal mengambil data order' }).code(500);
+    }
 };
 const slorderdetail = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    const { id } = request.params;
 
+    try {
+        const orderDetail = await db('pembelian')
+            .join('product', 'pembelian.productID', '=', 'product.productID')
+            .join('user', 'pembelian.userID', '=', 'user.userID')
+            .select(
+                'pembelian.pembelianID',
+                'user.userName',
+                'product.productName',
+                'pembelian.jumlah',
+                'pembelian.alamat',
+                'pembelian.totalHarga',
+                'pembelian.status',
+                'pembelian.tanggalPembelian'
+            )
+            .where('product.userID', '=', sellerID)
+            .andWhere('pembelian.pembelianID', '=', id)
+            .first();
+        
+        return h.response({
+            status: 'success',
+            message: 'Data order berhasil dimuat',
+            data: orderDetail
+        }).code(200);
+    } catch (error) {
+        console.error('Error saat fetch order detail:', error);
+        return h.response({ status: 'error', message: 'Gagal mengambil data order' }).code(500);
+    }
 };
 const slorderconfirm = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    const { id } = request.params;
 
+    try {
+        const order = await db('pembelian')
+            .join('product', 'pembelian.productID', '=', 'product.productID')
+            .where('product.userID', '=', sellerID)
+            .andWhere('pembelian.pembelianID', '=', id)
+            .first();
+        
+        if (!order) {
+            return h.response({ status: 'fail', message: 'Order tidak ditemukan' }).code(404);
+        }
+
+        if (order.status !== 'Proses') {
+            return h.response({ status: 'fail', message: `Gagal. Status order saat ini adalah '${order.status}'. Hanya order 'Proses' yang bisa diselesaikan.` }).code(400);
+        }
+
+        await db('pembelian')
+            .where('pembelianID', id)
+            .update({ status: 'Dikirim' });
+        
+        return h.response({
+            status: 'success',
+            message: 'Orderan telah dikirim.'
+        }).code(200);
+    } catch (error) {
+        console.error('Confirm Error:', error);
+        return h.response({ status: 'error', message: 'Gagal mengupdate status order' }).code(500);
+    }
 };
 const slordercancel = async (request, h) => {
+    const db = request.server.app.db;
+    const sellerID = request.auth.credentials.user.id;
+    const { id } = request.params;
 
+    try {
+        const order = await db('pembelian')
+            .join('product', 'pembelian.productID', '=', 'product.productID')
+            .where('product.userID', '=', sellerID)
+            .andWhere('pembelian.pembelianID', '=', id)
+            .first();
+        
+        if (!order) {
+            return h.response({ status: 'fail', message: 'Order tidak ditemukan' }).code(404);
+        }
+
+        if (order.status !== 'Proses') {
+            return h.response({ status: 'fail', message: `Gagal. Status order saat ini adalah '${order.status}'. Hanya order 'Proses' yang bisa diselesaikan.` }).code(400);
+        }
+
+        await db('pembelian')
+            .where('pembelianID', id)
+            .update({ status: 'Batal' });
+        
+        return h.response({
+            status: 'success',
+            message: 'Orderan telah dibatalkan.'
+        }).code(200);
+    } catch (error) {
+        console.error('Confirm Error:', error);
+        return h.response({ status: 'error', message: 'Gagal mengupdate status order' }).code(500);
+    }
 };
 
 module.exports = {

@@ -67,9 +67,7 @@ const routes = [
     {
         method: 'GET',
         path:'/products/{id}',
-        options: {
-            auth: false, 
-        },
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: productdetail,
     },
     {
@@ -86,11 +84,13 @@ const routes = [
     {
         method: 'GET',
         path: '/cart/{id}',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: detailkeranjang,
     },
     {
         method: 'DELETE',
         path: '/cart/{id}',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: hapuskeranjang,
     },
     {
@@ -116,18 +116,21 @@ const routes = [
         //detail pembelian
         method: 'GET',
         path: '/order/{id}',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: orderdetail,
     },
     {
         //verivikasi datang
         method: 'POST',
         path: '/order/{id}/confirm',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: orderconfirm,
     },
     {
-        //verivikasi datang
+        //cancel
         method: 'POST',
         path: '/order/{id}/cancel',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: ordercancel,
     },
 
@@ -203,7 +206,6 @@ const routes = [
                     image: Joi.any().meta({ swaggerType: 'file' }).required() // File gambar
                 }),
                 failAction: (request, h, err) => {
-                    // Menampilkan pesan error validasi yang jelas
                     throw err;
                 }
             }
@@ -214,6 +216,7 @@ const routes = [
         //delete product
         method: 'DELETE',
         path: '/seller/products/{id}',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: sldeleteproduct,
     },
     {
@@ -226,18 +229,21 @@ const routes = [
         //detail penjualan
         method: 'GET',
         path: '/seller/order/{id}',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: slorderdetail,
     },
     {
         //verifikasi kirim barang
         method: 'POST',
         path: '/seller/order/{id}/confirm',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: slorderconfirm,
     },
     {
-        //verifikasi kirim barang
+        //cancel
         method: 'POST',
         path: '/seller/order/{id}/cancel',
+        options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: slordercancel,
     },
     {
