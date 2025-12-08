@@ -94,7 +94,7 @@ const slproductlist = async (request, h) => {
 const sladdproduct = async (request, h) => {
     // 1. Ambil instance database (Knex) dari server.app
     const db = request.server.app.db;
-    const sellerID = request.auth.credentials.userID;
+    const sellerID = request.auth.credentials.user.id;
 
     // 2. Ambil data dari payload
     const { productName, harga, stok, deskripsi, kategoriID, image } = request.payload;

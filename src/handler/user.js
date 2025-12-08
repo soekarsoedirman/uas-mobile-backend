@@ -132,7 +132,7 @@ const keranjang = async (request, h) => {
                 'product.harga',
                 'product.foto'
             )
-            .where('keranjang.userID', '=', request.auth.credentials.userID);
+            .where('keranjang.userID', '=', request.auth.credentials.user.id);
         
         return h.response({
             status: 'success',
