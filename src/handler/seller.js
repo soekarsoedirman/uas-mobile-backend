@@ -377,7 +377,7 @@ const slordercancel = async (request, h) => {
 
         // 3. Cek Status (Harus Pending baru bisa batal)
         // Pastikan tulisan 'Pending' sama persis dengan di database (Case Sensitive)
-        if (order.status !== 'Pending') { 
+        if (order.status !== 'Proses') { 
             return h.response({ 
                 status: 'fail', 
                 message: `Gagal. Status saat ini '${order.status}'. Hanya status 'Pending' yang bisa dibatalkan.` 
