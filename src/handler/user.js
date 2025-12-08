@@ -259,7 +259,7 @@ const order = async (request, h) => {
                 alamat: alamat,
                 totalHarga: totalHarga,
                 status: 'Proses',
-                tanggal: new Date() // Timestamp sekarang
+                tanggal_transaksi: new Date() // Timestamp sekarang
             });
 
             // B. UPDATE STOK PRODUK (Kurangi Stok, Tambah Terjual)
@@ -296,7 +296,7 @@ const orderlist = async (request, h) => {
                 'pembelian.jumlah',
                 'pembelian.totalHarga',
                 'pembelian.status',
-                'pembelian.tanggal',
+                'pembelian.tanggal_transaksi',
                 'product.productName',
                 'user.userName',
                 'product.foto'
@@ -326,7 +326,7 @@ const orderdetail = async (request, h) => {
                 'pembelian.jumlah',
                 'pembelian.totalHarga',
                 'pembelian.status',
-                'pembelian.tanggal',
+                'pembelian.tanggal_transaksi',
                 'pembelian.alamat',
                 'product.productName',
                 'user.userName',

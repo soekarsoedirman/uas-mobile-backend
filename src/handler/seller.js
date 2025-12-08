@@ -229,7 +229,7 @@ const slorderlist = async (request, h) => {
                 'product.productName',
                 'pembelian.totalHarga',
                 'pembelian.status',
-                'pembelian.tanggalPembelian'
+                'pembelian.tanggal_transaksi'
             )
             .where('product.userID', '=', sellerID);
 
@@ -260,7 +260,7 @@ const slorderdetail = async (request, h) => {
                 'pembelian.alamat',
                 'pembelian.totalHarga',
                 'pembelian.status',
-                'pembelian.tanggalPembelian'
+                'pembelian.tanggal_transaksi'
             )
             .where('product.userID', '=', sellerID)
             .andWhere('pembelian.pembelianID', '=', id)
@@ -279,34 +279,78 @@ const slorderdetail = async (request, h) => {
 const slorderconfirm = async (request, h) => {
     const db = request.server.app.db;
     const sellerID = request.auth.credentials.user.id;
-    const { id } = request.params;
+    const { id } = request.params; // ID Pembelian
+
+    // Mulai Transaksi (Agar aman update 2 tabel sekaligus)
+    const trx = await db.transaction();
 
     try {
-        const order = await db('pembelian')
+        // 1. Cek Order & Validasi Milik Seller
+        // Kita perlu ambil 'productID' dan 'jumlah' untuk update stok nanti
+        const order = await trx('pembelian')
             .join('product', 'pembelian.productID', '=', 'product.productID')
-            .where('product.userID', '=', sellerID)
-            .andWhere('pembelian.pembelianID', '=', id)
+            .select(
+                'pembelian.pembelianID',
+                'pembelian.status',
+                'pembelian.productID', // Penting untuk update produk
+                'pembelian.jumlah',    // Penting untuk kurangi stok
+                'product.userID as sellerID',
+                'product.stok'         // Cek sisa stok
+            )
+            .where('pembelian.pembelianID', id)
             .first();
         
+        // Validasi: Order tidak ditemukan
         if (!order) {
+            await trx.rollback();
             return h.response({ status: 'fail', message: 'Order tidak ditemukan' }).code(404);
         }
 
-        if (order.status !== 'Proses') {
-            return h.response({ status: 'fail', message: `Gagal. Status order saat ini adalah '${order.status}'. Hanya order 'Proses' yang bisa diselesaikan.` }).code(400);
+        // Validasi: Apakah produk ini milik seller yang login?
+        if (order.sellerID !== sellerID) {
+            await trx.rollback();
+            return h.response({ status: 'fail', message: 'Akses ditolak. Bukan produk Anda.' }).code(403);
         }
 
-        await db('pembelian')
+        // Validasi Status: Hanya bisa kirim jika status masih 'Pending'
+        if (order.status !== 'Pending') {
+            await trx.rollback();
+            return h.response({ 
+                status: 'fail', 
+                message: `Gagal. Status order saat ini '${order.status}'. Hanya order 'Pending' yang bisa dikirim.` 
+            }).code(400);
+        }
+
+        // Validasi Stok: Cek apakah stok cukup sebelum dikurangi
+        if (order.stok < order.jumlah) {
+            await trx.rollback();
+            return h.response({ status: 'fail', message: 'Stok produk tidak cukup untuk memenuhi pesanan ini.' }).code(400);
+        }
+
+        // 2. Update Status Pembelian -> 'Dikirim'
+        await trx('pembelian')
             .where('pembelianID', id)
             .update({ status: 'Dikirim' });
+
+        // 3. Update Tabel Produk (Kurangi Stok, Tambah Terjual)
+        await trx('product')
+            .where('productID', order.productID)
+            .decrement('stok', order.jumlah)   // Kurangi stok sesuai jumlah beli
+            .increment('terjual', order.jumlah); // Tambah terjual sesuai jumlah beli
+
+        // Simpan Perubahan
+        await trx.commit();
         
         return h.response({
             status: 'success',
-            message: 'Orderan telah dikirim.'
+            message: 'Orderan telah dikirim. Stok produk berhasil diperbarui.'
         }).code(200);
+
     } catch (error) {
+        // Batalkan semua perubahan jika ada error
+        await trx.rollback();
         console.error('Confirm Error:', error);
-        return h.response({ status: 'error', message: 'Gagal mengupdate status order' }).code(500);
+        return h.response({ status: 'error', message: 'Gagal memproses order' }).code(500);
     }
 };
 const slordercancel = async (request, h) => {
