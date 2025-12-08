@@ -263,10 +263,6 @@ const order = async (request, h) => {
             });
 
             // B. UPDATE STOK PRODUK (Kurangi Stok, Tambah Terjual)
-            await trx('product')
-                .where('productID', item.productID)
-                .decrement('stok', item.jumlah)
-                .increment('terjual', item.jumlah);
         }
 
         // 3. Kosongkan keranjang User setelah berhasil beli
@@ -425,7 +421,7 @@ const ordercancel = async (request, h) => {
         
         return h.response({
             status: 'success',
-            message: 'Terima kasih! Order telah dikonfirmasi selesai.'
+            message: 'Orderan telah dibatalkan.'
         }).code(200);
 
     } catch (error) {

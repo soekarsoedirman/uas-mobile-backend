@@ -361,16 +361,27 @@ const slordercancel = async (request, h) => {
     try {
         const order = await db('pembelian')
             .join('product', 'pembelian.productID', '=', 'product.productID')
-            .where('product.userID', '=', sellerID)
-            .andWhere('pembelian.pembelianID', '=', id)
+            .select('pembelian.*', 'product.userID as sellerID') // Select sellerID untuk cek manual
+            .where('pembelian.pembelianID', id)
             .first();
         
+        // 1. Cek apakah order ada?
         if (!order) {
-            return h.response({ status: 'fail', message: 'Order tidak ditemukan' }).code(404);
+            return h.response({ status: 'fail', message: 'Order ID tidak ditemukan di database' }).code(404);
         }
 
-        if (order.status !== 'Proses') {
-            return h.response({ status: 'fail', message: `Gagal. Status order saat ini adalah '${order.status}'. Hanya order 'Proses' yang bisa diselesaikan.` }).code(400);
+        // 2. Cek apakah ini milik seller yang login?
+        if (order.sellerID !== sellerID) {
+            return h.response({ status: 'fail', message: 'Akses ditolak. Ini order milik Seller lain.' }).code(403);
+        }
+
+        // 3. Cek Status (Harus Pending baru bisa batal)
+        // Pastikan tulisan 'Pending' sama persis dengan di database (Case Sensitive)
+        if (order.status !== 'Pending') { 
+            return h.response({ 
+                status: 'fail', 
+                message: `Gagal. Status saat ini '${order.status}'. Hanya status 'Pending' yang bisa dibatalkan.` 
+            }).code(400);
         }
 
         await db('pembelian')
@@ -381,9 +392,10 @@ const slordercancel = async (request, h) => {
             status: 'success',
             message: 'Orderan telah dibatalkan.'
         }).code(200);
+
     } catch (error) {
-        console.error('Confirm Error:', error);
-        return h.response({ status: 'error', message: 'Gagal mengupdate status order' }).code(500);
+        console.error('Cancel Error:', error);
+        return h.response({ status: 'error', message: 'Internal Server Error' }).code(500);
     }
 };
 
