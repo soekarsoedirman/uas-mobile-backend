@@ -205,7 +205,7 @@ const sldeleteproduct = async (request, h) => {
     const { id } = request.params;
 
     try {
-        const product = await db('product').where({ productID: id, userID: sellerID }).dell();
+        const product = await db('product').where({ productID: id, userID: sellerID }).del();
         return h.response({ 
             status: 'success', 
             message: 'Produk dihapus',
