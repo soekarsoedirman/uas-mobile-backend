@@ -83,7 +83,7 @@ const routes = [
     },
     {
         method: 'GET',
-        path:'/products/{id}',
+        path:'/products/{productID}',
         options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: productdetail,
     },
@@ -100,13 +100,13 @@ const routes = [
     },
     {
         method: 'GET',
-        path: '/cart/{id}',
+        path: '/cart/{keranjangID}',
         options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: detailkeranjang,
     },
     {
         method: 'DELETE',
-        path: '/cart/{id}',
+        path: '/cart/{keranjangID}',
         options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: hapuskeranjang,
     },
@@ -132,7 +132,7 @@ const routes = [
     {
         //detail pembelian
         method: 'GET',
-        path: '/order/{id}',
+        path: '/order/{pembelianID}',
         options: { validate: { params: Joi.object({ id: Joi.number().required() }) } },
         handler: orderdetail,
     },
