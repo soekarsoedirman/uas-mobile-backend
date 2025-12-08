@@ -313,7 +313,7 @@ const slorderconfirm = async (request, h) => {
         }
 
         // Validasi Status: Hanya bisa kirim jika status masih 'Pending'
-        if (order.status !== 'Pending') {
+        if (order.status !== 'Proses') {
             await trx.rollback();
             return h.response({ 
                 status: 'fail', 
