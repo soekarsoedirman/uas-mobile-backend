@@ -63,7 +63,7 @@ const sldashboard = async (request, h) => {
 
 const slproductlist = async (request, h) => {
     const db = request.server.app.db;
-    const userID = request.auth.credentials.userID;
+    const userID = request.auth.credentials.user.id;
 
     try {
         const listproducts = await db('product')
