@@ -32,15 +32,32 @@ const routes = [
     {
         method: 'POST',
         path: '/login',
-        options: {
-            auth: false 
-        },
+        options: { 
+            auth: false,
+            validate: {
+                payload: Joi.object({
+                    email: Joi.string().email().required(),
+                    password: Joi.string().required()
+                })
+            }
+        }, 
         handler: authlogin,
     },
     {
         method: 'POST',
         path: '/register',
-        options: {auth: false},
+        options: { 
+            auth: false,
+            validate: {
+                payload: Joi.object({
+                    username: Joi.string().min(3).required(),
+                    email: Joi.string().email().required(),
+                    password: Joi.string().min(6).required(),
+                    roleID: Joi.number().integer().valid(1, 2).required(), // 1=User, 2=Seller
+                    noHP: Joi.string().max(15).optional()
+                })
+            }
+        }, 
         handler: authregister,
     },
     {
