@@ -216,8 +216,7 @@ const routes = [
                     productName: Joi.string().min(3).required(),
                     harga: Joi.number().min(100).required(),
                     stok: Joi.number().integer().min(0).required(),
-                    deskripsi: Joi.string().optional(),
-                    userID: Joi.number().integer().required(),    // ID User dummy
+                    deskripsi: Joi.string().optional(),   // ID User dummy
                     kategoriID: Joi.number().integer().required(), // ID Kategori dummy
                     image: Joi.any().meta({ swaggerType: 'file' }).required() // File gambar
                 }),
